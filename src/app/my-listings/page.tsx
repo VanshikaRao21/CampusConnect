@@ -19,11 +19,13 @@ import {
 } from 'lucide-react';
 import { Listing } from '../../types/listing';
 import { dataClient, authClient } from '../../lib/amplifyClient';
+import AuthModal from '../../components/auth/AuthModal';
 
 export default function MyListingsPage() {
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState({ userId: '', email: '', isAuthenticated: true });
+  const [currentUser, setCurrentUser] = useState({ userId: '', email: '', isAuthenticated: false });
+  const [authOpen, setAuthOpen] = useState(false);
 
   // Edit price modal state
   const [editingItem, setEditingItem] = useState<Listing | null>(null);
@@ -36,13 +38,10 @@ export default function MyListingsPage() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const user = authClient.getCurrentUser();
+      const user = await authClient.restoreSession();
       setCurrentUser(user);
-
-      const all = await dataClient.getListings();
-      // Filter for items owned by this student
-      const mine = all.filter((item) => item.owner === user.userId || item.owner.startsWith('user_student_'));
-      setMyListings(mine);
+      if (!user.isAuthenticated || !user.userId) { setMyListings([]); return; }
+      setMyListings(await dataClient.getListingsByOwner(user.userId));
     } catch (err: any) {
       setActionError(err.message || 'Failed to load personal listings');
     } finally {
@@ -58,8 +57,9 @@ export default function MyListingsPage() {
 
   const handleToggleSold = async (item: Listing) => {
     try {
+      if (!currentUser.isAuthenticated || item.owner !== currentUser.userId) throw new Error('You can only change listings owned by your account.');
       const nextStatus = item.status === 'SOLD' ? 'ACTIVE' : 'SOLD';
-      await dataClient.updateListing(item.id, { status: nextStatus }, item.owner);
+      await dataClient.updateListing(item.id, { status: nextStatus }, currentUser.userId);
       await loadData();
     } catch (err: any) {
       setActionError(err.message);
@@ -69,6 +69,7 @@ export default function MyListingsPage() {
   const handleSavePrice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
+    if (!currentUser.isAuthenticated || editingItem.owner !== currentUser.userId) { setActionError('You can only edit listings owned by your account.'); return; }
     const parsed = parseFloat(newPrice);
     if (isNaN(parsed) || parsed < 0) {
       setActionError('Please provide a valid non-negative price');
@@ -76,7 +77,7 @@ export default function MyListingsPage() {
     }
 
     try {
-      await dataClient.updateListing(editingItem.id, { price: parsed }, editingItem.owner);
+      await dataClient.updateListing(editingItem.id, { price: parsed }, currentUser.userId);
       setEditingItem(null);
       await loadData();
     } catch (err: any) {
@@ -86,8 +87,9 @@ export default function MyListingsPage() {
 
   const handleConfirmDelete = async () => {
     if (!deletingItem) return;
+    if (!currentUser.isAuthenticated || deletingItem.owner !== currentUser.userId) { setActionError('You can only delete listings owned by your account.'); return; }
     try {
-      await dataClient.deleteListing(deletingItem.id, deletingItem.owner);
+      await dataClient.deleteListing(deletingItem.id, currentUser.userId);
       setDeletingItem(null);
       await loadData();
     } catch (err: any) {
@@ -132,8 +134,7 @@ export default function MyListingsPage() {
         </div>
       )}
 
-      {/* Listings Table / Cards */}
-      {isLoading ? (
+      {!currentUser.isAuthenticated && !isLoading ? <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm"><ShieldCheck className="mx-auto mb-3 h-10 w-10 text-blue-600" /><h2 className="text-xl font-bold text-slate-900">Sign in to manage your listings</h2><p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Your dashboard is private to your student account. Sign in or create an account to continue.</p><button onClick={() => setAuthOpen(true)} className="mt-5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Student sign in</button></div> : isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-24 bg-slate-200 rounded-2xl animate-pulse" />
@@ -316,6 +317,7 @@ export default function MyListingsPage() {
         </div>
       )}
 
+      {authOpen && <AuthModal onClose={() => { setAuthOpen(false); loadData(); }} />}
     </div>
   );
 }

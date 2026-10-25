@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/usePathname';
 import NextLink from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -17,15 +16,16 @@ import {
   Database
 } from 'lucide-react';
 import { authClient } from '../../lib/amplifyClient';
+import AuthModal from '../auth/AuthModal';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState({ userId: '', email: '', isAuthenticated: true });
+  const [user, setUser] = useState({ userId: '', email: '', isAuthenticated: false });
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
-    const currentUser = authClient.getCurrentUser();
-    setUser(currentUser);
+    authClient.restoreSession().then(setUser);
 
     const handleAuthChange = () => {
       setUser(authClient.getCurrentUser());
@@ -34,6 +34,8 @@ export default function Navbar() {
     window.addEventListener('campusconnect_auth_updated', handleAuthChange);
     return () => window.removeEventListener('campusconnect_auth_updated', handleAuthChange);
   }, []);
+
+  const handleSignOut = async () => { await authClient.signOut(); setUser(authClient.getCurrentUser()); };
 
   const navLinks = [
     { name: 'Marketplace', href: '/', icon: ShoppingBag },
@@ -114,18 +116,13 @@ export default function Navbar() {
             </div>
 
             {/* User Profile */}
-            <NextLink
-              href="/my-listings"
-              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-colors"
-              title="Student Account"
-            >
+            {user.isAuthenticated ? <div className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 py-1.5 pl-2 pr-2" title={user.email}>
               <div className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold">
                 {user.email ? user.email.charAt(0).toUpperCase() : 'S'}
               </div>
-              <span className="text-xs font-semibold text-violet-900 truncate max-w-[110px]">
-                {user.email ? user.email.split('@')[0] : 'Student'}
-              </span>
-            </NextLink>
+              <NextLink href="/my-listings" className="max-w-[150px] truncate text-xs font-semibold text-violet-900">{user.email}</NextLink>
+              <button onClick={handleSignOut} className="rounded-full px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100">Sign out</button>
+            </div> : <button onClick={() => setAuthOpen(true)} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700">Student sign in</button>}
           </div>
 
           {/* Mobile menu button */}
@@ -171,6 +168,7 @@ export default function Navbar() {
               </NextLink>
             );
           })}
+          {user.isAuthenticated ? <div className="flex items-center justify-between border-t border-slate-100 pt-3"><span className="truncate text-sm font-medium text-violet-800">{user.email}</span><button onClick={handleSignOut} className="text-sm font-bold text-red-600">Sign out</button></div> : <button onClick={() => { setAuthOpen(true); setMobileMenuOpen(false); }} className="w-full rounded-xl bg-violet-600 px-3 py-2.5 text-left text-base font-bold text-white">Student sign in</button>}
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1.5 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -182,6 +180,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </header>
   );
 }

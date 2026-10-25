@@ -83,6 +83,11 @@ export default function CreateListingPage() {
       setErrors({});
 
       const user = authClient.getCurrentUser();
+      if (!user.isAuthenticated || !user.userId) {
+        setErrors({ form: 'Please sign in with your student account before publishing a listing.' });
+        setIsSubmitting(false);
+        return;
+      }
 
       // Submit to AWS DynamoDB / dataClient
       await dataClient.createListing({
@@ -94,7 +99,7 @@ export default function CreateListingPage() {
         imagePath: formData.imagePreview || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone,
-        owner: user.userId || 'user_student_demo',
+        owner: user.userId,
       });
 
       setSuccess(true);

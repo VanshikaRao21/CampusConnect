@@ -28,7 +28,7 @@ const schema = a.schema({
       allow.guest().to(['read']),
       allow.authenticated().to(['read']),
       // Authenticated owners have full CRUD on their listings
-      allow.owner(),
+      allow.ownerDefinedIn('owner').identityClaim('sub'),
     ]),
 });
 

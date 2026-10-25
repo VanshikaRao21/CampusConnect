@@ -1,5 +1,41 @@
 import { Listing, ItemCategory, ItemCondition, ItemStatus } from '../types/listing';
 import { INITIAL_DEMO_LISTINGS } from './mockData';
+import { Amplify } from 'aws-amplify';
+import { confirmSignUp as cognitoConfirmSignUp, fetchAuthSession, getCurrentUser as cognitoGetCurrentUser, signIn as cognitoSignIn, signOut as cognitoSignOut, signUp as cognitoSignUp } from 'aws-amplify/auth';
+import { generateClient } from 'aws-amplify/data';
+
+const poolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
+const clientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
+let authConfigured = false;
+if (poolId && clientId) {
+  Amplify.configure({ Auth: { Cognito: { userPoolId: poolId, userPoolClientId: clientId } } });
+  authConfigured = true;
+}
+let outputsPromise: Promise<boolean> | undefined;
+async function ensureAmplifyConfigured(): Promise<boolean> {
+  if (authConfigured) return true;
+  if (!outputsPromise) outputsPromise = (async () => {
+    try {
+      const response = await fetch('/amplify_outputs.json');
+      if (!response.ok) return false;
+      Amplify.configure(await response.json(), { ssr: true });
+      authConfigured = true;
+      return true;
+    } catch { return false; }
+  })();
+  return outputsPromise;
+}
+let cloudClientPromise: Promise<any | null> | undefined;
+async function getCloudClient(): Promise<any | null> {
+  if (process.env.NEXT_PUBLIC_DATA_MODE === 'local') return null;
+  if (!cloudClientPromise) cloudClientPromise = (async () => {
+    try {
+      if (!(await ensureAmplifyConfigured())) return null;
+      return generateClient();
+    } catch { return null; }
+  })();
+  return cloudClientPromise;
+}
 
 const LOCAL_STORAGE_KEY = 'campusconnect_listings_store';
 const CURRENT_USER_KEY = 'campusconnect_active_user';
@@ -43,6 +79,12 @@ export const dataClient = {
    * Fetch all active listings from the Data Warehouse / DynamoDB
    */
   async getListings(): Promise<Listing[]> {
+    const cloud = await getCloudClient();
+    if (cloud) {
+      const { data, errors } = await cloud.models.Listing.list();
+      if (errors?.length) throw new Error(errors[0].message);
+      return (data || []).map((item: any) => ({ ...item, id: item.id, imagePath: item.imagePath || '', status: item.status || 'ACTIVE' }));
+    }
     // Simulated cloud network latency (150ms for realistic UI skeleton feel)
     await new Promise((resolve) => setTimeout(resolve, 150));
     return getStoredListings();
@@ -70,6 +112,14 @@ export const dataClient = {
     contactPhone?: string;
     owner: string;
   }): Promise<Listing> {
+    const activeUser = authClient.getCurrentUser();
+    if (!activeUser.isAuthenticated || activeUser.userId !== data.owner) throw new Error('Sign in as the listing owner before creating a listing.');
+    const cloud = await getCloudClient();
+    if (cloud) {
+      const { data: created, errors } = await cloud.models.Listing.create(data);
+      if (errors?.length || !created) throw new Error(errors?.[0]?.message || 'Could not create listing');
+      return { ...created, imagePath: created.imagePath || '', status: created.status || 'ACTIVE' } as Listing;
+    }
     await new Promise((resolve) => setTimeout(resolve, 300));
     const listings = getStoredListings();
 
@@ -102,6 +152,16 @@ export const dataClient = {
     updates: Partial<Pick<Listing, 'title' | 'description' | 'price' | 'status' | 'condition'>>,
     ownerId: string
   ): Promise<Listing> {
+    const cloud = await getCloudClient();
+    if (cloud) {
+      const { data: existing, errors: readErrors } = await cloud.models.Listing.get({ id });
+      if (readErrors?.length || !existing) throw new Error(readErrors?.[0]?.message || 'Listing not found');
+      if (existing.owner !== ownerId) throw new Error('Unauthorized: You can only modify your own listings.');
+      const { data: updated, errors } = await cloud.models.Listing.update({ id, ...updates });
+      if (errors?.length || !updated) throw new Error(errors?.[0]?.message || 'Could not update listing');
+      window.dispatchEvent(new Event('campusconnect_data_updated'));
+      return { ...updated, imagePath: updated.imagePath || '', status: updated.status || 'ACTIVE' } as Listing;
+    }
     await new Promise((resolve) => setTimeout(resolve, 200));
     const listings = getStoredListings();
     const index = listings.findIndex((l) => l.id === id);
@@ -111,7 +171,8 @@ export const dataClient = {
     }
 
     // Backend ownership verification rule
-    if (listings[index].owner !== ownerId) {
+    const activeUser = authClient.getCurrentUser();
+    if (!activeUser.isAuthenticated || activeUser.userId !== ownerId || listings[index].owner !== ownerId) {
       throw new Error('Unauthorized: You can only modify your own listings.');
     }
 
@@ -126,10 +187,24 @@ export const dataClient = {
     return updatedItem;
   },
 
+  async getListingsByOwner(ownerId: string): Promise<Listing[]> {
+    return (await this.getListings()).filter((listing) => listing.owner === ownerId);
+  },
+
   /**
    * Delete a listing (enforces owner authorization)
    */
   async deleteListing(id: string, ownerId: string): Promise<boolean> {
+    const cloud = await getCloudClient();
+    if (cloud) {
+      const { data: existing, errors: readErrors } = await cloud.models.Listing.get({ id });
+      if (readErrors?.length || !existing) throw new Error(readErrors?.[0]?.message || 'Listing not found');
+      if (existing.owner !== ownerId) throw new Error('Unauthorized: Only the listing owner can delete this record.');
+      const { errors } = await cloud.models.Listing.delete({ id });
+      if (errors?.length) throw new Error(errors[0].message);
+      window.dispatchEvent(new Event('campusconnect_data_updated'));
+      return true;
+    }
     await new Promise((resolve) => setTimeout(resolve, 200));
     const listings = getStoredListings();
     const item = listings.find((l) => l.id === id);
@@ -138,7 +213,8 @@ export const dataClient = {
       throw new Error('Listing not found');
     }
 
-    if (item.owner !== ownerId) {
+    const activeUser = authClient.getCurrentUser();
+    if (!activeUser.isAuthenticated || activeUser.userId !== ownerId || item.owner !== ownerId) {
       throw new Error('Unauthorized: Only the listing owner can delete this record.');
     }
 
@@ -161,16 +237,46 @@ export const dataClient = {
  */
 export const authClient = {
   getCurrentUser() {
-    if (typeof window === 'undefined') {
-      return { userId: 'user_student_demo', email: 'student@campus.edu', isAuthenticated: true };
+    if (typeof window === 'undefined') return { userId: '', email: '', isAuthenticated: false };
+    try {
+      const raw = localStorage.getItem(CURRENT_USER_KEY);
+      return raw ? JSON.parse(raw) : { userId: '', email: '', isAuthenticated: false };
+    } catch {
+      return { userId: '', email: '', isAuthenticated: false };
     }
-    const raw = localStorage.getItem(CURRENT_USER_KEY);
-    if (!raw) {
-      const defaultUser = { userId: 'user_student_demo', email: 'vanshika.student@campus.edu', isAuthenticated: true };
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(defaultUser));
-      return defaultUser;
+  },
+
+  async restoreSession() {
+    if (typeof window === 'undefined') return this.getCurrentUser();
+    if (!(await ensureAmplifyConfigured())) return this.getCurrentUser();
+    try {
+      const [user, session] = await Promise.all([cognitoGetCurrentUser(), fetchAuthSession()]);
+      if (!session.tokens) throw new Error('No active session');
+      const email = user.signInDetails?.loginId || '';
+      const restored = { userId: user.userId, email, isAuthenticated: true };
+      this.setCurrentUser(restored);
+      return restored;
+    } catch {
+      this.signOutLocal();
+      return this.getCurrentUser();
     }
-    return JSON.parse(raw);
+  },
+
+  async signIn(email: string, password: string) {
+    if (!(await ensureAmplifyConfigured())) throw new Error('Cognito is not configured. Deploy the Amplify backend and provide amplify_outputs.json.');
+    const result = await cognitoSignIn({ username: email, password });
+    if (result.isSignedIn) await this.restoreSession();
+    return result;
+  },
+
+  async signUp(email: string, password: string) {
+    if (!(await ensureAmplifyConfigured())) throw new Error('Cognito is not configured. Deploy the Amplify backend and provide amplify_outputs.json.');
+    return cognitoSignUp({ username: email, password, options: { userAttributes: { email } } });
+  },
+
+  async confirmSignUp(email: string, code: string) {
+    if (!(await ensureAmplifyConfigured())) throw new Error('Cognito is not configured. Deploy the Amplify backend and provide amplify_outputs.json.');
+    return cognitoConfirmSignUp({ username: email, confirmationCode: code });
   },
 
   setCurrentUser(user: { userId: string; email: string; isAuthenticated: boolean }) {
@@ -180,10 +286,15 @@ export const authClient = {
     }
   },
 
-  signOut() {
+  signOutLocal() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(CURRENT_USER_KEY);
       window.dispatchEvent(new Event('campusconnect_auth_updated'));
     }
+  },
+
+  async signOut() {
+    if (authConfigured) await cognitoSignOut();
+    this.signOutLocal();
   },
 };
