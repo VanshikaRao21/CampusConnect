@@ -1,0 +1,31 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Environment Variables
+.env
+.env*.local
+
+# AWS Amplify Generated Files
+amplify_outputs.json
+amplifyconfiguration.json
+.amplify/
+
+# Operating System Files
+.DS_Store
+*.pem
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
