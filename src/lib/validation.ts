@@ -72,6 +72,16 @@ export function validateListingInput(input: {
   };
 }
 
+export function validateImage(type: string, size: number): { isValid: boolean; error?: string } {
+  if (!ALLOWED_IMAGE_TYPES.includes(type)) {
+    return { isValid: false, error: 'Invalid format' };
+  }
+  if (size > MAX_IMAGE_SIZE_BYTES) {
+    return { isValid: false, error: 'Exceeds 5MB' };
+  }
+  return { isValid: true };
+}
+
 export function validateImageFile(file: File): { isValid: boolean; error?: string } {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return {

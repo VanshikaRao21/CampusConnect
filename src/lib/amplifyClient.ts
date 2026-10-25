@@ -66,6 +66,7 @@ export const dataClient = {
     price: number;
     condition: ItemCondition;
     imagePath?: string;
+    s3Key?: string;
     contactEmail?: string;
     contactPhone?: string;
     owner: string;
@@ -81,6 +82,7 @@ export const dataClient = {
       price: Number(data.price),
       condition: data.condition,
       imagePath: data.imagePath || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+      s3Key: data.s3Key || `product-images/${data.owner}/${Date.now()}-photo.jpg`,
       status: 'ACTIVE',
       contactEmail: data.contactEmail?.trim(),
       contactPhone: data.contactPhone?.trim(),
