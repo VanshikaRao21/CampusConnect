@@ -18,6 +18,7 @@ export interface Listing {
   price: number;
   condition: ItemCondition;
   imagePath: string;
+  s3Key?: string;
   status: ItemStatus;
   contactEmail?: string;
   contactPhone?: string;
