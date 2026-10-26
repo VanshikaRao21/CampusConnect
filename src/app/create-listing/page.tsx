@@ -16,7 +16,6 @@ import {
   HardDrive,
   X
 } from 'lucide-react';
-import { uploadData } from 'aws-amplify/storage';
 import { dataClient, authClient } from '../../lib/amplifyClient';
 import { 
   VALID_CATEGORIES, 
@@ -109,6 +108,7 @@ export default function CreateListingPage() {
       // Upload photo to Amazon S3 bucket via Amplify Storage (uploadData)
       if (selectedFile) {
         try {
+          const { uploadData } = await import('aws-amplify/storage');
           const uploadOperation = uploadData({
             path: s3Key,
             data: selectedFile,
