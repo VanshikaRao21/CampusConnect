@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,16 +10,37 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        blur: {
+          bg: "#0B1320",
+          surface: "#0D1B2A",
+          card: "#112233",
+          border: "#1C334A",
+          teal: {
+            DEFAULT: "#00D2B4",
+            light: "#26E5C8",
+            dark: "#00A890",
+            glow: "rgba(0, 210, 180, 0.25)",
+          },
+          cyan: {
+            DEFAULT: "#06B6D4",
+            light: "#22D3EE",
+            dark: "#0891B2",
+          },
+          mint: {
+            DEFAULT: "#10B981",
+            light: "#34D399",
+          },
+        },
         brand: {
           blue: {
-            DEFAULT: "#2563EB",
-            50: "#EFF6FF",
-            100: "#DBEAFE",
-            200: "#BFDBFE",
-            500: "#2563EB",
-            600: "#1D4ED8",
-            700: "#1E40AF",
-            900: "#1E3A8A",
+            DEFAULT: "#00D2B4",
+            50: "#ECFDF5",
+            100: "#D1FAE5",
+            200: "#A7F3D0",
+            500: "#00D2B4",
+            600: "#00BFA5",
+            700: "#009688",
+            900: "#004D40",
           },
           lavender: {
             DEFAULT: "#8B5CF6",
@@ -31,21 +53,21 @@ const config: Config = {
             700: "#6D28D9",
           },
           lime: {
-            DEFAULT: "#84CC16",
-            50: "#F7FEE7",
-            100: "#ECFCCB",
-            400: "#A3E635",
-            500: "#84CC16",
-            600: "#65A30D",
+            DEFAULT: "#00D2B4",
+            50: "#F0FDF4",
+            100: "#DCFCE7",
+            400: "#4ADE80",
+            500: "#00D2B4",
+            600: "#16A34A",
           },
           navy: {
-            DEFAULT: "#0F172A",
+            DEFAULT: "#0B1320",
             50: "#F8FAFC",
             100: "#F1F5F9",
             200: "#E2E8F0",
-            700: "#334155",
-            800: "#1E293B",
-            900: "#0F172A",
+            700: "#1E293B",
+            800: "#0F172A",
+            900: "#0B1320",
           },
         },
       },
@@ -57,8 +79,9 @@ const config: Config = {
         "3xl": "1.5rem",
       },
       boxShadow: {
-        card: "0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 8px 16px -4px rgba(15, 23, 42, 0.04)",
-        "card-hover": "0 12px 24px -4px rgba(37, 99, 235, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.06)",
+        card: "0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 0 15px -3px rgba(0, 210, 180, 0.08)",
+        "card-hover": "0 12px 30px -4px rgba(0, 210, 180, 0.22), 0 0 20px -2px rgba(0, 210, 180, 0.15)",
+        teal: "0 0 25px -5px rgba(0, 210, 180, 0.4)",
         badge: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
       },
     },

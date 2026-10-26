@@ -3,44 +3,86 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-secondary: #8b5cf6;
-  --color-accent-lime: #84cc16;
-  --color-bg-light: #f8fafc;
-  --color-text-navy: #0f172a;
+  --color-primary: #00d2b4;
+  --color-primary-hover: #00bfa5;
+  --color-teal-glow: rgba(0, 210, 180, 0.25);
+  --color-bg-deep: #0b1320;
+  --color-bg-card: rgba(17, 34, 51, 0.75);
+  --color-border-card: rgba(0, 210, 180, 0.18);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  color: var(--color-text-navy);
-  background-color: var(--color-bg-light);
+  color: #f1f5f9;
+  background-color: #0b1320;
+  background-image: 
+    radial-gradient(circle at 15% 15%, rgba(0, 210, 180, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 65%, rgba(6, 182, 212, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+  background-attachment: fixed;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
+/* BlurAdmin Frosted Glass styling */
+.glass-panel {
+  background: rgba(13, 27, 42, 0.75);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 210, 180, 0.16);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-card {
+  background: rgba(17, 34, 51, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 210, 180, 0.14);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(0, 210, 180, 0.45);
+  box-shadow: 0 12px 30px -4px rgba(0, 210, 180, 0.25), 0 0 15px -2px rgba(0, 210, 180, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Cyber Teal Glow Button */
+.btn-teal {
+  background: linear-gradient(135deg, #00d2b4 0%, #00bfa5 100%);
+  color: #0b1320;
+  font-weight: 700;
+  box-shadow: 0 4px 15px -2px rgba(0, 210, 180, 0.35);
+  transition: all 0.25s ease;
+}
+
+.btn-teal:hover {
+  background: linear-gradient(135deg, #26e5c8 0%, #00d2b4 100%);
+  box-shadow: 0 6px 22px -1px rgba(0, 210, 180, 0.55);
+  transform: scale(1.02);
+}
+
+/* Custom Cyber Teal Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #090f19;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #1c334a;
   border-radius: 4px;
+  border: 1px solid rgba(0, 210, 180, 0.15);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Glassmorphism accents for badges and navigation */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: #00d2b4;
 }

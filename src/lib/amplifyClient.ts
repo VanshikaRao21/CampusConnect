@@ -4,10 +4,11 @@ import { INITIAL_DEMO_LISTINGS } from './mockData';
 // Dynamic lazy loader for AWS Amplify packages
 async function loadAmplify() {
   try {
+    const dynamicImport = (pkg: string) => Function('p', 'return import(p)')(pkg);
     const [core, auth, data] = await Promise.all([
-      import('aws-amplify'),
-      import('aws-amplify/auth'),
-      import('aws-amplify/data'),
+      dynamicImport('aws-amplify'),
+      dynamicImport('aws-amplify/auth'),
+      dynamicImport('aws-amplify/data'),
     ]);
     return {
       Amplify: core.Amplify,
@@ -26,12 +27,11 @@ async function ensureAmplifyConfigured(): Promise<boolean> {
   if (authConfigured) return true;
   if (!outputsPromise) outputsPromise = (async () => {
     try {
-      const aws = await loadAmplify();
-      if (!aws) return false;
-
       const poolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
       const clientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
       if (poolId && clientId) {
+        const aws = await loadAmplify();
+        if (!aws) return false;
         aws.Amplify.configure({ Auth: { Cognito: { userPoolId: poolId, userPoolClientId: clientId } } });
         authConfigured = true;
         return true;
@@ -39,6 +39,8 @@ async function ensureAmplifyConfigured(): Promise<boolean> {
 
       const response = await fetch('/amplify_outputs.json');
       if (!response.ok) return false;
+      const aws = await loadAmplify();
+      if (!aws) return false;
       aws.Amplify.configure(await response.json(), { ssr: true });
       authConfigured = true;
       return true;
