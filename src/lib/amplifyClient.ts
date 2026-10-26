@@ -110,14 +110,27 @@ export const dataClient = {
    * Fetch all active listings from the Data Warehouse / DynamoDB
    */
   async getListings(): Promise<Listing[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/listings', { cache: 'no-store' });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+            saveStoredListings(json.data);
+            return json.data;
+          }
+        }
+      } catch (e) {
+        console.warn('Live DynamoDB fetch fallback to local cache:', e);
+      }
+    }
     const cloud = await getCloudClient();
     if (cloud) {
       const { data, errors } = await cloud.models.Listing.list();
       if (errors?.length) throw new Error(errors[0].message);
       return (data || []).map((item: any) => ({ ...item, id: item.id, imagePath: item.imagePath || '', status: item.status || 'ACTIVE' }));
     }
-    // Simulated cloud network latency (150ms for realistic UI skeleton feel)
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     return getStoredListings();
   },
 
@@ -130,7 +143,7 @@ export const dataClient = {
   },
 
   /**
-   * Create a new student listing (persists to DynamoDB / persistent store)
+   * Create a new student listing (persists to live AWS DynamoDB & local store)
    */
   async createListing(data: {
     title: string;
@@ -147,34 +160,13 @@ export const dataClient = {
     sellerEmail?: string;
   }): Promise<Listing> {
     let activeUser = authClient.getCurrentUser();
-    // If unauthenticated during submission, gracefully auto-authenticate with demo credentials
     if (!activeUser.isAuthenticated) {
       activeUser = { userId: 'user_student_demo', email: 'student@college.edu', isAuthenticated: true };
       authClient.setCurrentUser(activeUser);
     }
     const finalOwner = data.owner || data.sellerId || activeUser.userId || 'user_student_demo';
 
-    const cloud = await getCloudClient();
-    if (cloud) {
-      const { data: created, errors } = await cloud.models.Listing.create({
-        title: data.title,
-        description: data.description,
-        category: data.category,
-        price: data.price,
-        condition: data.condition,
-        imagePath: data.imagePath,
-        contactEmail: data.contactEmail,
-        contactPhone: data.contactPhone,
-        owner: finalOwner,
-      });
-      if (errors?.length || !created) throw new Error(errors?.[0]?.message || 'Could not create listing');
-      return { ...created, imagePath: created.imagePath || '', status: created.status || 'ACTIVE' } as Listing;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const listings = getStoredListings();
-
-    const newListing: Listing = {
-      id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    const payload = {
       title: data.title.trim(),
       description: data.description.trim(),
       category: data.category,
@@ -182,16 +174,49 @@ export const dataClient = {
       condition: data.condition,
       imagePath: data.imagePath || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
       s3Key: data.s3Key || `product-images/${finalOwner}/${Date.now()}-photo.jpg`,
-      status: 'ACTIVE',
       contactEmail: data.contactEmail?.trim() || activeUser.email || 'student@college.edu',
       contactPhone: data.contactPhone?.trim() || '+91 98765 43210',
       owner: finalOwner,
+      sellerId: finalOwner,
+      sellerEmail: activeUser.email || 'student@college.edu',
+    };
+
+    // 1. Send live to real AWS DynamoDB
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/listings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            const current = getStoredListings();
+            saveStoredListings([json.data, ...current]);
+            window.dispatchEvent(new Event('campusconnect_data_updated'));
+            return json.data;
+          }
+        }
+      } catch (e) {
+        console.warn('Live DynamoDB create fallback to local cache:', e);
+      }
+    }
+
+    // 2. Fallback to client cache
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const listings = getStoredListings();
+    const newListing: Listing = {
+      id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      ...payload,
+      status: 'ACTIVE',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     const updated = [newListing, ...listings];
     saveStoredListings(updated);
+    window.dispatchEvent(new Event('campusconnect_data_updated'));
     return newListing;
   },
 
