@@ -59,11 +59,20 @@ export default function Navbar() {
     setUser(authClient.getCurrentUser()); 
   };
 
+  const handleNavClick = (href: string) => {
+    if (typeof window !== 'undefined' && href.startsWith('/?view=')) {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('campusconnect_view_changed'));
+      }, 40);
+    }
+  };
+
   const navLinks = [
-    { name: 'Marketplace', href: '/', icon: ShoppingBag },
+    { name: 'Landing Page', href: '/?view=landing', icon: Sparkles },
+    { name: 'Marketplace', href: '/?view=marketplace', icon: ShoppingBag },
     { name: 'Sell an Item', href: '/create-listing', icon: PlusCircle, isCta: true },
     { name: 'My Listings', href: '/my-listings', icon: Layers },
-    { name: 'Cloud Architecture', href: '/about', icon: Info },
+    { name: 'AWS Architecture', href: '/about', icon: Info },
   ];
 
   return (
@@ -112,6 +121,7 @@ export default function Navbar() {
                 <NextLink
                   key={link.name}
                   href={link.href}
+                  onClick={() => handleNavClick(link.href)}
                   className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-semibold'

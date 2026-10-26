@@ -61,24 +61,43 @@ export default function HomePage() {
     sortBy: 'newest',
   });
 
-  // Check auth and initial view mode
+  // Check auth and initial view mode - default is ALWAYS Landing Page
   useEffect(() => {
     const currentUser = authClient.getCurrentUser();
     setUser(currentUser);
-    if (currentUser.isAuthenticated) {
-      setViewMode('marketplace');
+
+    // Only switch to marketplace if URL explicitly has ?view=marketplace
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('view') === 'marketplace') {
+        setViewMode('marketplace');
+      } else {
+        setViewMode('landing');
+      }
     }
 
     const handleAuthChange = () => {
       const updated = authClient.getCurrentUser();
       setUser(updated);
-      if (updated.isAuthenticated) {
+    };
+
+    const handlePopState = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('view') === 'marketplace') {
         setViewMode('marketplace');
+      } else {
+        setViewMode('landing');
       }
     };
 
     window.addEventListener('campusconnect_auth_updated', handleAuthChange);
-    return () => window.removeEventListener('campusconnect_auth_updated', handleAuthChange);
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('campusconnect_view_changed', handlePopState);
+    return () => {
+      window.removeEventListener('campusconnect_auth_updated', handleAuthChange);
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('campusconnect_view_changed', handlePopState);
+    };
   }, []);
 
   // Fetch listings from dataClient

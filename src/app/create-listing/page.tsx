@@ -15,7 +15,10 @@ import {
   Loader2,
   HardDrive,
   X,
-  Sparkles
+  Sparkles,
+  Zap,
+  Lock,
+  LogIn
 } from 'lucide-react';
 import { dataClient, authClient } from '../../lib/amplifyClient';
 import { 
@@ -33,6 +36,12 @@ export default function CreateListingPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  const [user, setUser] = useState<{ userId: string; email: string; isAuthenticated: boolean }>({
+    userId: '',
+    email: '',
+    isAuthenticated: false,
+  });
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -43,6 +52,42 @@ export default function CreateListingPage() {
     contactPhone: '+91 98765 43210',
     imagePreview: '',
   });
+
+  // Track authentication state
+  React.useEffect(() => {
+    const current = authClient.getCurrentUser();
+    setUser(current);
+    if (current.email) {
+      setFormData((prev) => ({ ...prev, contactEmail: current.email }));
+    }
+
+    const handleAuth = () => {
+      const updated = authClient.getCurrentUser();
+      setUser(updated);
+      if (updated.email) {
+        setFormData((prev) => ({ ...prev, contactEmail: updated.email }));
+      }
+    };
+
+    window.addEventListener('campusconnect_auth_updated', handleAuth);
+    return () => window.removeEventListener('campusconnect_auth_updated', handleAuth);
+  }, []);
+
+  const handleQuickSignIn = async () => {
+    try {
+      await authClient.signIn('student@college.edu', 'CampusConnect2026!');
+      const updated = authClient.getCurrentUser();
+      setUser(updated);
+      setFormData((prev) => ({ ...prev, contactEmail: updated.email }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.form;
+        return next;
+      });
+    } catch (err: any) {
+      setErrors({ form: 'Failed to sign in.' });
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -125,7 +170,8 @@ export default function CreateListingPage() {
         condition: formData.condition,
         imagePath: formData.imagePreview || (s3Key ? `https://s3.amazonaws.com/campusconnect/${s3Key}` : ''),
         s3Key: s3Key || undefined,
-        sellerId: user.userId || 'guest-student',
+        owner: user.userId || 'user_student_demo',
+        sellerId: user.userId || 'user_student_demo',
         sellerEmail: user.email || formData.contactEmail,
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone,
@@ -133,7 +179,7 @@ export default function CreateListingPage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/');
+        router.push('/?view=marketplace');
       }, 1500);
     } catch (err: any) {
       console.error('Failed to create listing', err);
@@ -176,6 +222,69 @@ export default function CreateListingPage() {
             </div>
           </div>
         </div>
+
+        {/* Student Auth Status / Action Banner */}
+        {user.isAuthenticated ? (
+          <div className="mb-6 p-4 rounded-2xl bg-[#0D1B2A] border border-teal-500/30 flex items-center justify-between shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-950 border border-teal-500/40 text-[#00D2B4] flex items-center justify-center font-bold">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Signed in as <strong className="text-[#00D2B4]">{user.email}</strong></span>
+                  <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-[#00D2B4] text-[10px]">Cognito Verified</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">Your listing will be linked to your student ID and stored in Amazon DynamoDB.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                authClient.signOutLocal();
+                setUser({ userId: '', email: '', isAuthenticated: false });
+              }}
+              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-[#1C334A] hover:bg-[#112233] transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <div className="mb-6 p-5 rounded-2xl bg-gradient-to-r from-teal-950/70 via-[#0D1B2A] to-[#112233] border border-teal-500/40 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#00D2B4] text-[#0B1320] flex items-center justify-center font-black shrink-0 mt-0.5 shadow-sm">
+                  <Zap className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Student Sign-In Required to Sell</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-teal-900/80 text-teal-300 font-semibold border border-teal-700">AWS Cognito</span>
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                    To prevent spam and ensure verified student trades, listings require authentication. Click below for instant 1-click student sign-in or enter college credentials.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleQuickSignIn}
+                  className="btn-teal py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-teal"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>1-Click Student Sign-In</span>
+                </button>
+                <NextLink
+                  href="/login"
+                  className="py-2.5 px-3.5 rounded-xl border border-[#1C334A] bg-[#09111C] hover:bg-[#112233] text-xs font-bold text-slate-200 transition-colors"
+                >
+                  Sign In / Register
+                </NextLink>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Form Card */}
         <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-teal-500/25 shadow-2xl">
